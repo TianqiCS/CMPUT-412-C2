@@ -1,0 +1,9 @@
+/.vscode
+/launch/3dsensor.launch
+/launch/bumper_bot.launch
+/launch/bumper_bot_real.launch
+/scripts/alex_hubers_follower.py
+/scripts/bumper_bot.py
+/scripts/patrick_goebel_follower.py
+/scripts/wanderSM.py
+
