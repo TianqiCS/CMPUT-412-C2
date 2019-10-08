@@ -5,7 +5,7 @@
     <node pkg="c2" name="c2_main" type="c2_main.py" output="screen"/>
     <node pkg="uvc_camera" type="uvc_camera_node" name="uvc_camera" output="screen">
         <param name="device" type="string" value="/dev/video1" />
-        <remap from="/image_raw" to="usb_cam/image_raw"/>
+        <!--remap from="/image_raw" to="usb_cam/image_raw"/-->
     <!-- <param name="width" type="int" value="320" />
     <param name="height" type="int" value="240" />
     <param name="fps" type="int" value="30" />
