@@ -42,8 +42,8 @@ class Follow(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['running', 'end'])
     def execute(self, userdata):
-        global total_redline
-        if total_redline == 0:
+        global total_redline, red
+        if not red:
             twist_pub.publish(current_twist)
             return 'running'
         else:
@@ -61,7 +61,6 @@ class PassThrough(smach.State):
             twist_pub.publish(current_twist)
             return 'running'
         else:
-            total_redline = 0
             return 'end'        
 
 class SmCore:
