@@ -127,11 +127,9 @@ class SmCore:
 
         
         # usb red
-        #lower_red = numpy.array([0, 100, 100])
-        #upper_red = numpy.array([360, 256, 256])
 
-        lower_red = numpy.array([170, 100, 120])
-        upper_red = numpy.array([180, 245, 220])
+        lower_red = numpy.array([0, 100, 100])
+        upper_red = numpy.array([360, 256, 256])
 
         # if loc3_stop_time == 0:
         #     lower_red = numpy.array([0, 150, 50])
