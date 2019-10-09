@@ -13,7 +13,7 @@ class Contour(Enum):
 class ContourDetector():
     def __init__(self):
         pass
-
+    
     def getContours(self, hsv, color = "red", loc = 2):
         contours = []
         blurred_hsv = cv2.pyrMeanShiftFiltering(hsv, 15, 20)
@@ -69,7 +69,7 @@ class ContourDetector():
         cv2.moveWindow(color + "mask", 710, 0)
         cv2.waitKey(4)
 
-        return contours
+        return contours #return a list of Class<Contour>
 
 def threshold_hsv_360(s_min, v_min, h_max, s_max, v_max, h_min, hsv):
     lower_color_range_0 = numpy.array([0, s_min, v_min],dtype=float)

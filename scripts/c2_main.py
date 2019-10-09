@@ -6,7 +6,7 @@ from tf.transformations import decompose_matrix, euler_from_quaternion
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from ros_numpy import numpify
+#from ros_numpy import numpify
 import numpy as np
 
 from kobuki_msgs.msg import Led
@@ -18,7 +18,7 @@ import smach_ros
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from ar_track_alvar_msgs.msg import AlvarMarkers
+#from ar_track_alvar_msgs.msg import AlvarMarkers
 import tf
 from sensor_msgs.msg import Joy
 
