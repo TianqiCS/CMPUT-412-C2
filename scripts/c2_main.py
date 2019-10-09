@@ -48,11 +48,11 @@ def approxEqual(a, b, tol = 0.001):
 
 class Follow(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['running', 'end', 'task1'])
+        smach.State.__init__(self, outcomes=['running', 'end', 'turning'])
     def execute(self, userdata):
         global total_redline, stop, turn
         if turn:
-            return 'task1'
+            return 'turning'
         if not stop:
             twist_pub.publish(current_twist)
             return 'running'
@@ -77,12 +77,11 @@ class Rotate(smach.State):
     def __init__(self):
         self.unit = math.pi/2  # 90 degrees
         smach.State.__init__(self, 
-                                outcomes=['running','end'],
+                                outcomes=['running','working','end'],
                                 input_keys=['rotate_turns_in'],
-                                output_keys=['rotate_turns_out']
         )
     def execute(self, userdata):
-        global g_odom, turn
+        global g_odom, turn, work, current_work
         init_yaw = g_odom['yaw_z']
         target_yaw = init_yaw + userdata.rotate_turns_in * self.unit
         if target_yaw >  math.pi:
@@ -92,7 +91,13 @@ class Rotate(smach.State):
         twist = Twist()
         while True:
             if approxEqual(g_odom['yaw_z'], target_yaw):
-                return 'end'
+                turn = False
+                if not work:
+                    return 'working'
+                else:
+                    work = False
+                    current_work += 1
+                    return 'end'
 
             elif g_odom['yaw_z'] > target_yaw:
                 twist.angular.z = -0.3
@@ -101,45 +106,30 @@ class Rotate(smach.State):
             twist_pub.publish(twist)
         return 'running'
 
-class Task1(smach.State):
+class TaskControl(smach.State):
     def __init__(self):
         smach.State.__init__(self, 
-                                outcomes=['turning', 'working', 'end'],
-                                input_keys=['rotate_turns_in', 'task_worked_in'],
-                                output_keys=['rotate_turns_out']
-        )
+                                outcomes=['end'],
+                                output_keys=['rotate_turns'])
     def execute(self, userdata):
-        global turn, work, current_work
-        if not work and turn:
-            turn = False
-            userdata.rotate_turns_out = 1
-            return 'turning'
-        elif not work and not turn:
-            turn = True
-            return 'working'
-        elif work and turn:
-            turn = False
-            userdata.rotate_turns_out = -1
-            return 'turning'
-        elif work and not turn:
-            turn = False
-            work = False
-            current_work += 1
-            return 'end'
+        global current_work
+        userdata.rotate_turns = 1
+        return 'end'
 
 class Work(smach.State):
     def __init__(self):
         smach.State.__init__(self, 
-                                outcomes=['end'],
-                                input_keys=['task_worked_in'],
-                                output_keys=['task_worked_out']
+                                outcomes=['rotate'],
+                                output_keys=['task_worked_out', 'rotate_turns']
         )
     def execute(self, userdata):
-        global work
+        global work, current_work
         rospy.sleep(3)
         work = True
+        current_work += 1
         userdata.task_worked_out = 1
-        return 'end'
+        userdata.rotate_turns = -1
+        return 'rotate'
 
 class SmCore:
     def __init__(self):
@@ -153,26 +143,22 @@ class SmCore:
             smach.StateMachine.add('Follow', Follow(),
                                     transitions={'running':'Follow',
                                                 'end':'PassThrough',
-                                                'task1':'Task1'
+                                                'turning':'TaskControl'
                                                 })
             smach.StateMachine.add('PassThrough', PassThrough(),
                                     transitions={'running':'PassThrough',
                                                 'end':'Follow'})                    
             smach.StateMachine.add('Rotate', Rotate(),
                                     transitions={'running':'Rotate',
-                                                'end':'Task1'},
-                                    remapping={'rotate_turns_in':'turns', 
-                                               'rotate_turns_out':'turns'})
-            smach.StateMachine.add('Task1', Task1(),
-                                    transitions={'working':'Work',
-                                                'turning':'Rotate',
-                                                'end':'Follow'},
-                                    remapping={'rotate_turns_in':'turns', 
-                                               'rotate_turns_out':'turns', 
-                                               'task_worked_in':'task1'})
+                                                'working': 'Work',
+                                                'end': 'Follow'},
+                                    remapping={'rotate_turns_in':'turns'})
+            smach.StateMachine.add('TaskControl', TaskControl(),
+                                    transitions={'end':'Rotate'},
+                                    remapping={'rotate_turns':'turns'})
             smach.StateMachine.add('Work', Work(),
-                                    transitions={'end':'Task1'},
-                                    remapping={'task_worked_in':'task1', 
+                                    transitions={'rotate':'Rotate'},
+                                    remapping={'rotate_turns':'turns',
                                                'task_worked_out':'task1'})                                                           
             self.bridge = cv_bridge.CvBridge()
 
