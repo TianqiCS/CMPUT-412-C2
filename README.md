@@ -58,7 +58,7 @@ Location 3: The final challenge is to determine the shape of the green object at
         - 1. Following state will keep the robot following the white line
         - 2. If the robot hit a long red line it will enter the PassThrough state to perform a stop at the long red line
         - 3. If the robot hit a short red line it will enter the TaskControl state to determine how many 90 degrees it should trun and then it goes into Rotate state which controls the robot's rotation based on the yaw value.
-####notes:
+        - 4. In the Rotate state, the robot will determine what kind of work it will do based on current value.
+#### Notes:
 -    We put additional usb camera at the front of the turtle_bot to follow the white line on the ground and the asus camera is used to detect shape of the target
 -    In the function usb_callback, we use the usb camera to detect whether we have a long red line or short red line. The method is that if it is a long red line there won't be any white in the middle of the track. We think its quicker and easier to identify the difference between two lines.
--    
