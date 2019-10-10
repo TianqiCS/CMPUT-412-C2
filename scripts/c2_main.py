@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import math
+import math, time
 from math import copysign
 
 import rospy, cv2, cv_bridge, numpy
@@ -26,31 +26,37 @@ from sensor_msgs.msg import Joy
 from nav_msgs.srv import SetMap
 from nav_msgs.msg import OccupancyGrid
 
-current_twist = Twist()
-total_redline = 0
-stop = False
-work = False
-turn = False
-current_work = 0
-g_odom = {'x':0.0, 'y':0.0, 'yaw_z':0.0}
-rospy.init_node('c2_main')
+from detectshapes import ContourDetector
+from detectshapes import Contour
 
-
-twist_pub = rospy.Publisher("/cmd_vel_mux/input/teleop", Twist, queue_size=1)
-led_pub_1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size=1)
-led_pub_2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size=1)
-sound_pub = rospy.Publisher('/mobile_base/commands/sound', Sound, queue_size=1)
-
-current_time = rospy.Time.now()
 
 def approxEqual(a, b, tol = 0.001):
     return abs(a - b) <= tol
 
+def publish_sound_led(quantity):
+    global sound_pub, led_pub_1, led_pub_2
+    if quantity == 1:
+        led_pub_1.publish(Led.GREEN)
+    elif quantity == 1:
+        led_pub_2.publish(Led.GREEN)
+    else:
+        led_pub_1.publish(Led.GREEN)
+        led_pub_2.publish(Led.GREEN)
+
+    for i in range(quantity):
+        sound_pub.publish(1)
+        rospy.sleep(1)
+    
+    led_pub_1.publish(Led.BLACK)
+    led_pub_2.publish(Led.BLACK)
+
 class Follow(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['running', 'end', 'turning'])
+
     def execute(self, userdata):
-        global total_redline, stop, turn
+        global stop, turn, twist_pub, current_work
+
         if turn:
             return 'turning'
         if not stop:
@@ -61,12 +67,15 @@ class Follow(smach.State):
             twist_pub.publish(twist)
             rospy.sleep(0.5)
             return 'end'
-
+        
+                
+                
 class PassThrough(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['running', 'end'])
+
     def execute(self, userdata):
-        global total_redline, stop
+        global stop, twist_pub
         if stop:
             twist_pub.publish(current_twist)
             return 'running'
@@ -77,11 +86,12 @@ class Rotate(smach.State):
     def __init__(self):
         self.unit = math.pi/2  # 90 degrees
         smach.State.__init__(self, 
-                                outcomes=['running','working','end'],
+                                outcomes=['running','working1','working2','working3','end'],
                                 input_keys=['rotate_turns_in'],
         )
+
     def execute(self, userdata):
-        global g_odom, turn, work, current_work
+        global g_odom, turn, work, current_work, twist_pub
         init_yaw = g_odom['yaw_z']
         target_yaw = init_yaw + userdata.rotate_turns_in * self.unit
         if target_yaw >  math.pi:
@@ -92,17 +102,22 @@ class Rotate(smach.State):
         while True:
             if approxEqual(g_odom['yaw_z'], target_yaw):
                 turn = False
-                if not work:
-                    return 'working'
+                if work:
+                    if current_work == 1:
+                        return 'working1'
+                    elif current_work == 2:
+                        return 'working2'
+                    else:
+                        return 'working3'
                 else:
-                    work = False
-                    current_work += 1
+                    work = True
                     return 'end'
 
-            elif g_odom['yaw_z'] > target_yaw:
+            elif g_odom['yaw_z']> target_yaw:
                 twist.angular.z = -0.3
             else:
                 twist.angular.z = 0.3
+            print g_odom['yaw_z'], target_yaw
             twist_pub.publish(twist)
         return 'running'
 
@@ -111,31 +126,193 @@ class TaskControl(smach.State):
         smach.State.__init__(self, 
                                 outcomes=['end'],
                                 output_keys=['rotate_turns'])
+
     def execute(self, userdata):
         global current_work
         userdata.rotate_turns = 1
         return 'end'
 
-class Work(smach.State):
+class Work1(smach.State):
     def __init__(self):
+        self.hsv = None
         smach.State.__init__(self, 
                                 outcomes=['rotate'],
-                                output_keys=['task_worked_out', 'rotate_turns']
+                                output_keys=['rotate_turns']
         )
+
     def execute(self, userdata):
         global work, current_work
-        rospy.sleep(3)
-        work = True
+        self.observe()
+        work = False
         current_work += 1
-        userdata.task_worked_out = 1
+        userdata.rotate_turns = -1
+        time.sleep(0.5)
+        return 'rotate'
+    
+    def observe(self):
+        global twist_pub
+
+        cd = ContourDetector()
+        image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
+        task_done = False
+        start_time = time.time()
+        while not task_done and time.time() - start_time < 5:
+            if self.hsv != None:
+                contours1 = cd.getContours(self.hsv, "red", 1)
+                twist = Twist()
+                twist.angular.z = 0.1
+                twist_pub.publish(twist)
+                rospy.sleep(0.5)
+                contours2 = cd.getContours(self.hsv, "red", 1)
+                twist.angular.z = -0.1
+                twist_pub.publish(twist)
+                if len(contours1) == len(contours2):
+                    print "numer of objects:", len(contours1)
+                    publish_sound_led(len(contours1))
+                    task_done = True
+        if task_done == False:
+            contours = cd.getContours(self.hsv, "red", 1)
+            number = 3 if len(contours) == 0 else len(contours)
+            print "Failed Handle: number of objects: ", number 
+            publish_sound_led(number)
+        image_sub.unregister()
+
+    def shape_cam_callback(self, msg):
+        bridge = cv_bridge.CvBridge()
+        image = bridge.imgmsg_to_cv2(msg, desired_encoding = 'bgr8')
+        self.hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+class Work2(smach.State):
+    def __init__(self):
+        self.hsv = None
+        smach.State.__init__(self, 
+                                outcomes=['rotate'],
+                                output_keys=['rotate_turns']
+        )
+
+    def execute(self, userdata):
+        global work, current_work
+        self.observe()
+        work = False
+        current_work += 1
         userdata.rotate_turns = -1
         return 'rotate'
+    
+    def observe(self):
+        global shape_at_loc2, twist_pub
+
+        shape_at_loc2 = Contour.Circle
+        # cd = ContourDetector()
+        # image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
+
+        # task_done = False
+        # start_time = time.time()
+        # while not task_done and time.time() - start_time < 5:
+        #     if self.hsv != None:
+        #         contours1 = cd.getContours(self.hsv, "red and green", 2)
+        #         twist = Twist()
+        #         twist.angular.z = 0.1
+        #         twist_pub.publish(twist)
+        #         rospy.sleep(0.5)
+        #         contours2 = cd.getContours(self.hsv, "red and green", 2)
+        #         twist.angular.z = -0.1
+        #         twist_pub.publish(twist)
+        #         if len(contours1) == len(contours2):
+        #             print "number of objects:", len(contours1)
+        #             publish_sound_led(len(contours1))
+        #             task_done = True
+        # if task_done == False:
+        #     contours = cd.getContours(self.hsv, "red and green", 1)
+        #     number = 3 if len(contours) == 0 else len(contours)
+        #     print "Failed Handle: number of objects: ", number
+        #     publish_sound_led(number)
+        
+        # task_done = False
+        # start_time = time.time()
+        # while not task_done and time.time() - start_time < 5:
+        #     if self.hsv != None:
+        #         contours1 = cd.getContours(self.hsv, "green", 2)
+        #         twist = Twist()
+        #         twist.angular.z = 0.1
+        #         twist_pub.publish(twist)
+        #         rospy.sleep(0.5)
+        #         contours2 = cd.getContours(self.hsv, "green", 2)
+        #         twist.angular.z = -0.1
+        #         twist_pub.publish(twist)
+        #         if len(contours1) == len(contours2) and len(contours1) > 0:
+        #             if contours1[0] == contours2[0]:
+        #                 shape_at_loc2 = contours1[0]
+        #                 print "shape at loc2: ", shape_at_loc2
+        #                 task_done = True
+        # if task_done == False:
+        #     contours = cd.getContours(self.hsv, "green", 2)
+        #     shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
+        #     print "Failed Handle: shape at loc2: ", shape_at_loc2
+
+        # image_sub.unregister()
+
+    def shape_cam_callback(self, msg):
+        bridge = cv_bridge.CvBridge()
+        image = bridge.imgmsg_to_cv2(msg, desired_encoding = 'bgr8')
+        self.hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+class Work3(smach.State):
+    def __init__(self):
+        self.hsv = None
+        smach.State.__init__(self, 
+                                outcomes=['rotate'],
+                                output_keys=['rotate_turns']
+        )
+        
+    def execute(self, userdata):
+        global work, current_work
+        self.observe()
+        work = False
+        userdata.rotate_turns = -1
+        return 'rotate'
+    
+    def observe(self):
+        global current_work, twist_pub, shape_at_loc2, redline_count_loc3
+        redline_count_loc3 += 1
+        cd = ContourDetector()
+        image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
+
+        task_done = False
+        start_time = time.time()
+        while not task_done and time.time() - start_time < 5:
+            if self.hsv != None:
+                contours1 = cd.getContours(self.hsv, "red", 2)
+                twist = Twist()
+                twist.angular.z = 0.1
+                twist_pub.publish(twist)
+                rospy.sleep(0.5)
+                contours2 = cd.getContours(self.hsv, "red", 2)
+                twist.angular.z = -0.1
+                twist_pub.publish(twist)
+                if len(contours1) == len(contours2) and len(contours1) > 0:
+                    if contours1[0] == contours2[0] and contours1[0] == shape_at_loc2:
+                        print "Found ", contours1[0]
+                        publish_sound_led(1)
+                    else:
+                        print "Not Matching"
+                    task_done = True
+
+        if task_done == False and redline_count_loc3 == 3:
+            print "Failed Handle: Found", shape_at_loc2
+            publish_sound_led(1)
+
+        image_sub.unregister()
+
+    def shape_cam_callback(self, msg):
+        bridge = cv_bridge.CvBridge()
+        image = bridge.imgmsg_to_cv2(msg, desired_encoding = 'bgr8')
+        self.hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
 class SmCore:
     def __init__(self):
         self.sm = smach.StateMachine(outcomes=['end'])
-        self.sm.userdata.task1 = False
-        self.sm.userdata.turn = 0
+        #self.sm.userdata.turn = 0
+        self.sm.userdata.turns = 0
         self.sis = smach_ros.IntrospectionServer('server_name', self.sm, '/SM_ROOT')
 
         self.sis.start()
@@ -150,16 +327,23 @@ class SmCore:
                                                 'end':'Follow'})                    
             smach.StateMachine.add('Rotate', Rotate(),
                                     transitions={'running':'Rotate',
-                                                'working': 'Work',
+                                                'working1': 'Work1',
+                                                'working2': 'Work2',
+                                                'working3': 'Work3',
                                                 'end': 'Follow'},
                                     remapping={'rotate_turns_in':'turns'})
             smach.StateMachine.add('TaskControl', TaskControl(),
                                     transitions={'end':'Rotate'},
                                     remapping={'rotate_turns':'turns'})
-            smach.StateMachine.add('Work', Work(),
+            smach.StateMachine.add('Work1', Work1(),
                                     transitions={'rotate':'Rotate'},
-                                    remapping={'rotate_turns':'turns',
-                                               'task_worked_out':'task1'})                                                           
+                                    remapping={'rotate_turns':'turns'})
+            smach.StateMachine.add('Work2', Work2(),
+                                    transitions={'rotate':'Rotate'},
+                                    remapping={'rotate_turns':'turns'})   
+            smach.StateMachine.add('Work3', Work3(),
+                                    transitions={'rotate':'Rotate'},
+                                    remapping={'rotate_turns':'turns'})                                                              
             self.bridge = cv_bridge.CvBridge()
 
             self.integral = 0
@@ -190,28 +374,32 @@ class SmCore:
         g_odom['yaw_z'] = yaw[2]
 
     def usb_image_callback(self, msg):
-        global stop_line_flag, flag_line_flag, counter_loc1, counter_loc2, object_type, backing_flag, current_type, max_linear_vel, time_after_stop, is_end_of_line, is_moving_loc2, is_end_loc2, total_redline, stop, turn
+        global stop, turn, current_work
+
+        full_red_line = False
+
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         #image = cv2.flip(image, -1)  ### flip
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
         # white color
         lower_white = numpy.array([0, 0, 200])
         upper_white = numpy.array([360, 30, 255])
 
-        mask = cv2.inRange(hsv, lower_white, upper_white)
-
-        h, w, d = image.shape
+        white_mask = cv2.inRange(hsv, lower_white, upper_white)
+        h, w, _ = image.shape
         search_top = 3 * h / 4 + 20
         search_bot = 3 * h / 4 + 30
-        mask[0:search_top, 0:w] = 0
-        mask[search_bot:h, 0:w] = 0
+        white_mask[0:search_top, 0:w] = 0
+        white_mask[search_bot:h, 0:w] = 0
 
-        M = cv2.moments(mask)
+        M = cv2.moments(white_mask)
 
         if M['m00'] > 0:
             self.cx_white = int(M['m10'] / M['m00'])
             self.cy_white = int(M['m01'] / M['m00'])
             cv2.circle(image, (self.cx_white, self.cy_white), 20, (0, 0, 255), -1)
+
             # BEGIN CONTROL
             err = self.cx_white - w / 2
             current_twist.linear.x = 0.5  # and <= 1.7
@@ -226,30 +414,22 @@ class SmCore:
         else:
             self.cx_white = 0
 
-
-        
-
-        
         # usb red
-
         lower_red = numpy.array([0, 100, 100])
         upper_red = numpy.array([360, 256, 256])
 
-        # if loc3_stop_time == 0:
-        #     lower_red = numpy.array([0, 150, 50])
-        #     upper_red = numpy.array([360, 256, 256])
-
-        mask = cv2.inRange(hsv, lower_red, upper_red)
+        red_mask = cv2.inRange(hsv, lower_red, upper_red)
 
         h, w, d = image.shape
 
         search_top = h - 40
         search_bot = h - 1
 
-        mask[0:search_top, 0:w] = 0
-        mask[search_bot:h, 0:w] = 0
+        red_mask[0:search_top, 0:w] = 0
+        red_mask[search_bot:h, 0:w] = 0
 
-        im2, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        im2, contours, hierarchy = cv2.findContours(red_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 0:
 
@@ -264,26 +444,41 @@ class SmCore:
                     center = (int(x), int(y))
                     radius = int(radius)
                     cv2.circle(image, center, radius, (0, 255, 0), 2)
-                    total_redline += 1
-                    if self.cx_white == 0:
+                    if self.cx_white == 0: #full red line
+                        full_red_line = True
                         stop = True
-                    elif x + radius < self.cx_white:
+                    elif x + radius < self.cx_white: #half red line
                         if "Rotate" not in self.sm.get_active_states():
                             rospy.sleep(0.5)
                             turn = True
                 elif "PassThrough" in self.sm.get_active_states():
                     stop = False
 
-        # red_mask = cv2.inRange(hsv, lower_red, upper_red)
 
-        cv2.imshow("refer_dot", image)
-        cv2.waitKey(3)
+            cv2.imshow("refer_dot", white_mask)
+            cv2.waitKey(3)
+            print stop
 
     def execute(self):
         outcome = self.sm.execute()
         rospy.spin()
         self.sis.stop()
 
+current_twist = Twist()
+stop = False
+turn = False
+work = True
+shape_at_loc2 = None
+redline_count_loc3 = 0
+current_work = 1
+g_odom = {'x':0.0, 'y':0.0, 'yaw_z':0.0}
+
+rospy.init_node('c2_main')
+
+twist_pub = rospy.Publisher("/cmd_vel_mux/input/teleop", Twist, queue_size=1)
+led_pub_1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size=1)
+led_pub_2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size=1)
+sound_pub = rospy.Publisher('/mobile_base/commands/sound', Sound, queue_size=1)
     
 c = SmCore()
 c.execute()
