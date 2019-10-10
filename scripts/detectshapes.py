@@ -38,21 +38,21 @@ class ContourDetector():
         search_bot = h
         search_left = 0
         search_right = w
-        print search_top, search_bot, search_left, search_right
+        #print search_top, search_bot, search_left, search_right
         if loc == 1:
-            print "loc = 1"
+            #print "loc = 1"
             search_top = 4 * h / 5
             search_bot = h
         elif loc == 2:
-            print "loc = 2"
+            #print "loc = 2"
             search_top = 2 * h / 5
             search_bot = h
         elif loc == 3:
-            print "loc = 3"
+            #print "loc = 3"
             search_top = 5 * h / 7
-            search_left = 1 * w / 4 
-            search_right = 3 * w / 4
-        print search_top, search_bot, search_left, search_right
+            search_left = 1 * w / 6 
+            search_right = 5 * w / 6
+        #print search_top, search_bot, search_left, search_right
         mask[0:search_top, 0:w] = 0
         mask[search_bot:h, 0:w] = 0
         mask[0:h, 0:search_left] = 0

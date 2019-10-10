@@ -50,6 +50,20 @@ def publish_sound_led(quantity):
     led_pub_1.publish(Led.BLACK)
     led_pub_2.publish(Led.BLACK)
 
+def move_forward(meters):
+    global g_odom, twist_pub
+    ori_x = g_odom['x']
+    ori_y = g_odom['y']
+    twist = Twist()
+    twist.linear.x = 0.1
+    if meters < 0 :
+        twist.linear.x = -0.1
+    while True:
+        twist_pub.publish(twist)
+        if abs(ori_x - g_odom['x']) > abs(meters) or abs(ori_y - g_odom['y']) > abs(meters):
+            break
+
+
 class Follow(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['running', 'end', 'turning'])
@@ -101,7 +115,7 @@ class Rotate(smach.State):
         twist = Twist()
         #on_additional_line = True #debug
         while True:
-            if approxEqual(g_odom['yaw_z'], target_yaw):
+            if approxEqual(g_odom['yaw_z'], target_yaw, 0.01):
                 turn = False
                 if work:
                     if current_work == 1:
@@ -147,7 +161,9 @@ class Work1(smach.State):
 
     def execute(self, userdata):
         global work, current_work
+        move_forward(-0.1)
         self.observe()
+        move_forward(0.1)
         work = False
         current_work += 1
         userdata.rotate_turns = -1
@@ -156,25 +172,22 @@ class Work1(smach.State):
     
     def observe(self):
         global twist_pub
-
         cd = ContourDetector()
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
+        time.sleep(2)
         task_done = False
         start_time = time.time()
-        while not task_done and time.time() - start_time < 5:
+        for i in range(3):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red", 1)
-                twist = Twist()
-                twist.angular.z = 0.1
-                twist_pub.publish(twist)
-                rospy.sleep(0.5)
+                time.sleep(3)
                 contours2 = cd.getContours(self.hsv, "red", 1)
-                twist.angular.z = -0.1
-                twist_pub.publish(twist)
+                print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
                     print "numer of objects:", len(contours1)
                     publish_sound_led(len(contours1))
                     task_done = True
+                    break
         if task_done == False:
             contours = cd.getContours(self.hsv, "red", 1)
             number = 3 if len(contours) == 0 else len(contours)
@@ -204,27 +217,24 @@ class Work2(smach.State):
         return 'rotate'
     
     def observe(self):
-        global shape_at_loc2, twist_pub
+        global shape_at_loc2
 
         cd = ContourDetector()
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
-
+        time.sleep(3)
         task_done = False
         start_time = time.time()
-        while not task_done and time.time() - start_time < 5:
+        for i in range(3):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red and green", 2)
-                twist = Twist()
-                twist.angular.z = 0.1
-                twist_pub.publish(twist)
-                rospy.sleep(0.5)
+                rospy.sleep(3)
                 contours2 = cd.getContours(self.hsv, "red and green", 2)
-                twist.angular.z = -0.1
-                twist_pub.publish(twist)
+                print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
                     print "number of objects:", len(contours1)
                     publish_sound_led(len(contours1))
                     task_done = True
+                    break
         if task_done == False:
             contours = cd.getContours(self.hsv, "red and green", 1)
             number = 3 if len(contours) == 0 else len(contours)
@@ -233,21 +243,18 @@ class Work2(smach.State):
         
         task_done = False
         start_time = time.time()
-        while not task_done and time.time() - start_time < 5:
+        for i in range(3):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "green", 2)
-                twist = Twist()
-                twist.angular.z = 0.1
-                twist_pub.publish(twist)
-                rospy.sleep(0.5)
+                rospy.sleep(3)
                 contours2 = cd.getContours(self.hsv, "green", 2)
-                twist.angular.z = -0.1
-                twist_pub.publish(twist)
+                print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2) and len(contours1) > 0:
                     if contours1[0] == contours2[0]:
                         shape_at_loc2 = contours1[0]
                         print "shape at loc2: ", shape_at_loc2
                         task_done = True
+                        break
         if task_done == False:
             contours = cd.getContours(self.hsv, "green", 2)
             shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
@@ -320,14 +327,7 @@ class Work2Follow(smach.State):
             self.w2_stop = True
             if M_red['m00'] > 0 and current_work == 3:
                 print 'saw red'
-                ori_x = g_odom['x']
-                ori_y = g_odom['y']
-                twist = Twist()
-                twist.linear.x = 0.1
-                while True:
-                    twist_pub.publish(twist)
-                    if abs(ori_x - g_odom['x']) > 0.15 or abs(ori_y - g_odom['y']) > 0.15:
-                        break
+                move_forward(0.1)
 
 class Work3(smach.State):
     def __init__(self):
@@ -338,37 +338,39 @@ class Work3(smach.State):
         )
         
     def execute(self, userdata):
-        global work, current_work
+        global work, current_work, redline_count_loc3
+        redline_count_loc3 += 1
+
+        move_forward(-0.12)
         self.observe()
+        move_forward(0.12)
         work = False
         userdata.rotate_turns = -1
         return 'rotate'
     
     def observe(self):
-        global current_work, twist_pub, shape_at_loc2, redline_count_loc3
-        redline_count_loc3 += 1
+        global current_work, shape_at_loc2, redline_count_loc3
         cd = ContourDetector()
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
-
+        time.sleep(3)
         task_done = False
         start_time = time.time()
-        while not task_done and time.time() - start_time < 5:
+        for i in range(3):
             if self.hsv != None:
-                contours1 = cd.getContours(self.hsv, "red", 2)
-                twist = Twist()
-                twist.angular.z = 0.1
-                twist_pub.publish(twist)
-                rospy.sleep(0.5)
-                contours2 = cd.getContours(self.hsv, "red", 2)
-                twist.angular.z = -0.1
-                twist_pub.publish(twist)
+                contours1 = cd.getContours(self.hsv, "red", 3)
+                rospy.sleep(3)
+                contours2 = cd.getContours(self.hsv, "red", 3)
+                print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2) and len(contours1) > 0:
-                    if contours1[0] == contours2[0] and contours1[0] == shape_at_loc2:
-                        print "Found ", contours1[0]
-                        publish_sound_led(1)
-                    else:
-                        print "Not Matching"
-                    task_done = True
+                    if contours1[0] == contours2[0]:
+                        if contours1[0] == shape_at_loc2:
+                            print "Matched: ", contours1[0]
+                            publish_sound_led(1)
+                            task_done = True
+                            break
+                        else:
+                            print("Found but not matched: ", contours1[0])
+            print 'shape_at_loc2: ', shape_at_loc2
 
         if task_done == False and redline_count_loc3 == 3:
             print "Failed Handle: Found", shape_at_loc2
@@ -533,8 +535,8 @@ class SmCore:
                 elif "PassThrough" in self.sm.get_active_states():
                     stop = False
 
-            cv2.imshow("refer_dot", image)
-            cv2.waitKey(3)
+            # cv2.imshow("refer_dot", image)
+            # cv2.waitKey(3)
             #print stop, turn
     def execute(self):
         outcome = self.sm.execute()
