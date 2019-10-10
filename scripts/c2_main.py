@@ -37,7 +37,7 @@ def publish_sound_led(quantity):
     global sound_pub, led_pub_1, led_pub_2
     if quantity == 1:
         led_pub_1.publish(Led.GREEN)
-    elif quantity == 1:
+    elif quantity == 2:
         led_pub_2.publish(Led.GREEN)
     else:
         led_pub_1.publish(Led.GREEN)
@@ -91,7 +91,7 @@ class Rotate(smach.State):
         )
 
     def execute(self, userdata):
-        global g_odom, turn, work, current_work, twist_pub
+        global g_odom, turn, work, current_work, twist_pub, on_additional_line
         init_yaw = g_odom['yaw_z']
         target_yaw = init_yaw + userdata.rotate_turns_in * self.unit
         if target_yaw >  math.pi:
@@ -99,6 +99,7 @@ class Rotate(smach.State):
         if target_yaw < -1 * math.pi:
             target_yaw = target_yaw + 2 * math.pi
         twist = Twist()
+        #on_additional_line = True #debug
         while True:
             if approxEqual(g_odom['yaw_z'], target_yaw):
                 turn = False
@@ -106,18 +107,22 @@ class Rotate(smach.State):
                     if current_work == 1:
                         return 'working1'
                     elif current_work == 2:
+                        on_additional_line = True
                         return 'working2'
                     else:
                         return 'working3'
                 else:
-                    work = True
-                    return 'end'
+                    if on_additional_line:
+                        return 'working2'
+                    else:
+                        work = True
+                        return 'end'
 
             elif g_odom['yaw_z']> target_yaw:
                 twist.angular.z = -0.3
             else:
                 twist.angular.z = 0.3
-            print g_odom['yaw_z'], target_yaw
+            #print g_odom['yaw_z'], target_yaw
             twist_pub.publish(twist)
         return 'running'
 
@@ -195,66 +200,134 @@ class Work2(smach.State):
         self.observe()
         work = False
         current_work += 1
-        userdata.rotate_turns = -1
+        userdata.rotate_turns = -2
         return 'rotate'
     
     def observe(self):
         global shape_at_loc2, twist_pub
 
-        shape_at_loc2 = Contour.Circle
-        # cd = ContourDetector()
-        # image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
+        cd = ContourDetector()
+        image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
 
-        # task_done = False
-        # start_time = time.time()
-        # while not task_done and time.time() - start_time < 5:
-        #     if self.hsv != None:
-        #         contours1 = cd.getContours(self.hsv, "red and green", 2)
-        #         twist = Twist()
-        #         twist.angular.z = 0.1
-        #         twist_pub.publish(twist)
-        #         rospy.sleep(0.5)
-        #         contours2 = cd.getContours(self.hsv, "red and green", 2)
-        #         twist.angular.z = -0.1
-        #         twist_pub.publish(twist)
-        #         if len(contours1) == len(contours2):
-        #             print "number of objects:", len(contours1)
-        #             publish_sound_led(len(contours1))
-        #             task_done = True
-        # if task_done == False:
-        #     contours = cd.getContours(self.hsv, "red and green", 1)
-        #     number = 3 if len(contours) == 0 else len(contours)
-        #     print "Failed Handle: number of objects: ", number
-        #     publish_sound_led(number)
+        task_done = False
+        start_time = time.time()
+        while not task_done and time.time() - start_time < 5:
+            if self.hsv != None:
+                contours1 = cd.getContours(self.hsv, "red and green", 2)
+                twist = Twist()
+                twist.angular.z = 0.1
+                twist_pub.publish(twist)
+                rospy.sleep(0.5)
+                contours2 = cd.getContours(self.hsv, "red and green", 2)
+                twist.angular.z = -0.1
+                twist_pub.publish(twist)
+                if len(contours1) == len(contours2):
+                    print "number of objects:", len(contours1)
+                    publish_sound_led(len(contours1))
+                    task_done = True
+        if task_done == False:
+            contours = cd.getContours(self.hsv, "red and green", 1)
+            number = 3 if len(contours) == 0 else len(contours)
+            print "Failed Handle: number of objects: ", number
+            publish_sound_led(number)
         
-        # task_done = False
-        # start_time = time.time()
-        # while not task_done and time.time() - start_time < 5:
-        #     if self.hsv != None:
-        #         contours1 = cd.getContours(self.hsv, "green", 2)
-        #         twist = Twist()
-        #         twist.angular.z = 0.1
-        #         twist_pub.publish(twist)
-        #         rospy.sleep(0.5)
-        #         contours2 = cd.getContours(self.hsv, "green", 2)
-        #         twist.angular.z = -0.1
-        #         twist_pub.publish(twist)
-        #         if len(contours1) == len(contours2) and len(contours1) > 0:
-        #             if contours1[0] == contours2[0]:
-        #                 shape_at_loc2 = contours1[0]
-        #                 print "shape at loc2: ", shape_at_loc2
-        #                 task_done = True
-        # if task_done == False:
-        #     contours = cd.getContours(self.hsv, "green", 2)
-        #     shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
-        #     print "Failed Handle: shape at loc2: ", shape_at_loc2
+        task_done = False
+        start_time = time.time()
+        while not task_done and time.time() - start_time < 5:
+            if self.hsv != None:
+                contours1 = cd.getContours(self.hsv, "green", 2)
+                twist = Twist()
+                twist.angular.z = 0.1
+                twist_pub.publish(twist)
+                rospy.sleep(0.5)
+                contours2 = cd.getContours(self.hsv, "green", 2)
+                twist.angular.z = -0.1
+                twist_pub.publish(twist)
+                if len(contours1) == len(contours2) and len(contours1) > 0:
+                    if contours1[0] == contours2[0]:
+                        shape_at_loc2 = contours1[0]
+                        print "shape at loc2: ", shape_at_loc2
+                        task_done = True
+        if task_done == False:
+            contours = cd.getContours(self.hsv, "green", 2)
+            shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
+            print "Failed Handle: shape at loc2: ", shape_at_loc2
 
-        # image_sub.unregister()
+        image_sub.unregister()
 
     def shape_cam_callback(self, msg):
         bridge = cv_bridge.CvBridge()
         image = bridge.imgmsg_to_cv2(msg, desired_encoding = 'bgr8')
         self.hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+class Work2Follow(smach.State):
+    def __init__(self):
+        self.w2_twist = Twist()
+        self.w2_stop = False
+        self.w2_integral = 0
+        self.w2_previous_error = 0
+
+        self.w2_Kp = - 2 / 200.0
+        self.w2_Kd = 1 / 3000.0
+        self.w2_Ki = 0.0
+        smach.State.__init__(self, 
+                                outcomes=['arrived', 'returned', 'running'],
+                                output_keys=['rotate_turns']
+        )
+        
+    def execute(self, userdata):
+        global twist_pub, current_work, on_additional_line
+        time.sleep(2)
+        self.w2_stop = False
+        #if current_work < 2: #debug
+        #    current_work = 2 #debug 
+        while not self.w2_stop:
+            self.control_speed()
+        if current_work == 2:
+            return 'arrived'
+        else:
+            userdata.rotate_turns = 1
+            on_additional_line = False
+            return 'returned'
+    
+    def control_speed(self):
+        global white_mask, red_mask, g_odom, twist_pub, image_width, current_work
+
+        M_white = cv2.moments(white_mask)
+        M_red = cv2.moments(red_mask)
+
+        if M_white['m00'] > 0:
+            cx= int(M_white['m10'] / M_white['m00'])
+
+            # BEGIN CONTROL
+            err = cx - image_width / 2
+            self.w2_twist.linear.x = 0.5  # and <= 1.7
+
+            self.w2_integral = self.w2_integral + err * 0.05
+            self.w2_derivative = (err - self.w2_previous_error) / 0.05
+
+            self.w2_twist.angular.z = float(err) * self.w2_Kp + (self.w2_Ki * float(self.w2_integral)) + (
+                    self.w2_Kd * float(self.w2_derivative))
+
+            self.w2_previous_error = err
+
+            twist_pub.publish(self.w2_twist)
+            print 'saw white', self.w2_twist.angular.z
+        else:
+            print 'no white'
+            if current_work == 3:
+                time.sleep(1)
+            self.w2_stop = True
+            if M_red['m00'] > 0 and current_work == 3:
+                print 'saw red'
+                ori_x = g_odom['x']
+                ori_y = g_odom['y']
+                twist = Twist()
+                twist.linear.x = 0.1
+                while True:
+                    twist_pub.publish(twist)
+                    if abs(ori_x - g_odom['x']) > 0.15 or abs(ori_y - g_odom['y']) > 0.15:
+                        break
 
 class Work3(smach.State):
     def __init__(self):
@@ -316,7 +389,7 @@ class SmCore:
         self.sis = smach_ros.IntrospectionServer('server_name', self.sm, '/SM_ROOT')
 
         self.sis.start()
-        with self.sm:
+        with self.sm:   
             smach.StateMachine.add('Follow', Follow(),
                                     transitions={'running':'Follow',
                                                 'end':'PassThrough',
@@ -328,7 +401,7 @@ class SmCore:
             smach.StateMachine.add('Rotate', Rotate(),
                                     transitions={'running':'Rotate',
                                                 'working1': 'Work1',
-                                                'working2': 'Work2',
+                                                'working2': 'Work2Follow',
                                                 'working3': 'Work3',
                                                 'end': 'Follow'},
                                     remapping={'rotate_turns_in':'turns'})
@@ -340,7 +413,12 @@ class SmCore:
                                     remapping={'rotate_turns':'turns'})
             smach.StateMachine.add('Work2', Work2(),
                                     transitions={'rotate':'Rotate'},
-                                    remapping={'rotate_turns':'turns'})   
+                                    remapping={'rotate_turns':'turns'}) 
+            smach.StateMachine.add('Work2Follow', Work2Follow(),
+                                    transitions={'running':'Work2Follow',
+                                                'arrived':'Work2',
+                                                'returned':'Rotate'},
+                                    remapping={'rotate_turns':'turns'})
             smach.StateMachine.add('Work3', Work3(),
                                     transitions={'rotate':'Rotate'},
                                     remapping={'rotate_turns':'turns'})                                                              
@@ -374,7 +452,7 @@ class SmCore:
         g_odom['yaw_z'] = yaw[2]
 
     def usb_image_callback(self, msg):
-        global stop, turn, current_work
+        global stop, turn, current_work, white_mask, red_mask, image_width
 
         full_red_line = False
 
@@ -382,16 +460,32 @@ class SmCore:
         #image = cv2.flip(image, -1)  ### flip
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # white color
+        # white color mask
         lower_white = numpy.array([0, 0, 200])
         upper_white = numpy.array([360, 30, 255])
 
         white_mask = cv2.inRange(hsv, lower_white, upper_white)
         h, w, _ = image.shape
+        image_width = w
         search_top = 3 * h / 4 + 20
         search_bot = 3 * h / 4 + 30
         white_mask[0:search_top, 0:w] = 0
         white_mask[search_bot:h, 0:w] = 0
+
+        # red color mask
+        lower_red = numpy.array([0, 100, 100])
+        upper_red = numpy.array([360, 256, 256])
+
+        red_mask = cv2.inRange(hsv, lower_red, upper_red)
+
+        h, w, d = image.shape
+
+        search_top = h - 40
+        search_bot = h - 1
+
+        red_mask[0:search_top, 0:w] = 0
+        red_mask[search_bot:h, 0:w] = 0
+
 
         M = cv2.moments(white_mask)
 
@@ -413,21 +507,6 @@ class SmCore:
             self.previous_error = err
         else:
             self.cx_white = 0
-
-        # usb red
-        lower_red = numpy.array([0, 100, 100])
-        upper_red = numpy.array([360, 256, 256])
-
-        red_mask = cv2.inRange(hsv, lower_red, upper_red)
-
-        h, w, d = image.shape
-
-        search_top = h - 40
-        search_bot = h - 1
-
-        red_mask[0:search_top, 0:w] = 0
-        red_mask[search_bot:h, 0:w] = 0
-
         
         im2, contours, hierarchy = cv2.findContours(red_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -454,11 +533,9 @@ class SmCore:
                 elif "PassThrough" in self.sm.get_active_states():
                     stop = False
 
-
-            cv2.imshow("refer_dot", white_mask)
+            cv2.imshow("refer_dot", image)
             cv2.waitKey(3)
-            print stop
-
+            #print stop, turn
     def execute(self):
         outcome = self.sm.execute()
         rospy.spin()
@@ -471,6 +548,10 @@ work = True
 shape_at_loc2 = None
 redline_count_loc3 = 0
 current_work = 1
+on_additional_line = False
+white_mask = None
+red_mask = None
+image_width = 0
 g_odom = {'x':0.0, 'y':0.0, 'yaw_z':0.0}
 
 rospy.init_node('c2_main')
