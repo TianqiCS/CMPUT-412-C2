@@ -14,7 +14,7 @@ class ContourDetector():
     def __init__(self):
         pass
 
-    def getContours(self, hsv, color = "red", loc = 2):
+    def getContours(self, hsv, color = "red", loc = 2, loc3count = 0):
         contours = []
         blurred_hsv = cv2.pyrMeanShiftFiltering(hsv, 15, 20)
         
@@ -50,8 +50,11 @@ class ContourDetector():
         elif loc == 3:
             #print "loc = 3"
             search_top = 5 * h / 7
-            search_left = 1 * w / 6 
-            search_right = 5 * w / 6
+            if loc3count == 3:
+                search_left = 1 * w / 2
+            else:
+                search_left = 1 * w / 6 
+                search_right = 5 * w / 6
         #print search_top, search_bot, search_left, search_right
         mask[0:search_top, 0:w] = 0
         mask[search_bot:h, 0:w] = 0

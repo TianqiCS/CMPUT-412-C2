@@ -86,11 +86,13 @@ class Follow(smach.State):
                 
 class PassThrough(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['running', 'end'])
+        smach.State.__init__(self, outcomes=['running', 'end', 'finished'])
 
     def execute(self, userdata):
-        global stop, twist_pub
+        global stop, twist_pub, current_work
         if stop:
+            if current_work > 3:
+                return 'finished'
             twist_pub.publish(current_twist)
             return 'running'
         else:
@@ -163,7 +165,7 @@ class Work1(smach.State):
         global work, current_work
         move_forward(-0.1)
         self.observe()
-        move_forward(0.1)
+        move_forward(0.1)   
         work = False
         current_work += 1
         userdata.rotate_turns = -1
@@ -176,8 +178,7 @@ class Work1(smach.State):
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
         time.sleep(2)
         task_done = False
-        start_time = time.time()
-        for i in range(3):
+        for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red", 1)
                 time.sleep(3)
@@ -193,7 +194,7 @@ class Work1(smach.State):
             number = 3 if len(contours) == 0 else len(contours)
             print "Failed Handle: number of objects: ", number 
             publish_sound_led(number)
-        image_sub.unregister()
+        #image_sub.unregister()
 
     def shape_cam_callback(self, msg):
         bridge = cv_bridge.CvBridge()
@@ -221,10 +222,9 @@ class Work2(smach.State):
 
         cd = ContourDetector()
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
-        time.sleep(3)
+        time.sleep(1)
         task_done = False
-        start_time = time.time()
-        for i in range(3):
+        for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red and green", 2)
                 rospy.sleep(3)
@@ -236,14 +236,13 @@ class Work2(smach.State):
                     task_done = True
                     break
         if task_done == False:
-            contours = cd.getContours(self.hsv, "red and green", 1)
+            contours = cd.getContours(self.hsv, "red and green", 2)
             number = 3 if len(contours) == 0 else len(contours)
             print "Failed Handle: number of objects: ", number
             publish_sound_led(number)
         
         task_done = False
-        start_time = time.time()
-        for i in range(3):
+        for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "green", 2)
                 rospy.sleep(3)
@@ -260,7 +259,7 @@ class Work2(smach.State):
             shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
             print "Failed Handle: shape at loc2: ", shape_at_loc2
 
-        image_sub.unregister()
+        #image_sub.unregister()
 
     def shape_cam_callback(self, msg):
         bridge = cv_bridge.CvBridge()
@@ -284,7 +283,7 @@ class Work2Follow(smach.State):
         
     def execute(self, userdata):
         global twist_pub, current_work, on_additional_line
-        time.sleep(2)
+        time.sleep(1)
         self.w2_stop = False
         #if current_work < 2: #debug
         #    current_work = 2 #debug 
@@ -340,26 +339,26 @@ class Work3(smach.State):
     def execute(self, userdata):
         global work, current_work, redline_count_loc3
         redline_count_loc3 += 1
-
         move_forward(-0.12)
         self.observe()
         move_forward(0.12)
         work = False
+        if redline_count_loc3 >= 3:
+            current_work += 1
         userdata.rotate_turns = -1
         return 'rotate'
     
     def observe(self):
-        global current_work, shape_at_loc2, redline_count_loc3
+        global current_work, shape_at_loc2, redline_count_loc3, task3_finished
         cd = ContourDetector()
         image_sub = rospy.Subscriber("camera/rgb/image_raw", Image, self.shape_cam_callback)
-        time.sleep(3)
+        time.sleep(1)
         task_done = False
-        start_time = time.time()
-        for i in range(3):
+        for i in range(2):
             if self.hsv != None:
-                contours1 = cd.getContours(self.hsv, "red", 3)
+                contours1 = cd.getContours(self.hsv, "red", 3, redline_count_loc3)
                 rospy.sleep(3)
-                contours2 = cd.getContours(self.hsv, "red", 3)
+                contours2 = cd.getContours(self.hsv, "red", 3, redline_count_loc3)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2) and len(contours1) > 0:
                     if contours1[0] == contours2[0]:
@@ -367,12 +366,13 @@ class Work3(smach.State):
                             print "Matched: ", contours1[0]
                             publish_sound_led(1)
                             task_done = True
+                            task3_finished = True
                             break
                         else:
                             print("Found but not matched: ", contours1[0])
             print 'shape_at_loc2: ', shape_at_loc2
 
-        if task_done == False and redline_count_loc3 == 3:
+        if task_done == False and redline_count_loc3 == 3 and task3_finished == False:
             print "Failed Handle: Found", shape_at_loc2
             publish_sound_led(1)
 
@@ -399,7 +399,8 @@ class SmCore:
                                                 })
             smach.StateMachine.add('PassThrough', PassThrough(),
                                     transitions={'running':'PassThrough',
-                                                'end':'Follow'})                    
+                                                'end':'Follow',
+                                                'finished':'end'})                    
             smach.StateMachine.add('Rotate', Rotate(),
                                     transitions={'running':'Rotate',
                                                 'working1': 'Work1',
@@ -539,7 +540,10 @@ class SmCore:
             # cv2.waitKey(3)
             #print stop, turn
     def execute(self):
+        begin = time.time()
         outcome = self.sm.execute()
+        if outcome == 'end':
+            print 'time used:', time.time() - begin
         rospy.spin()
         self.sis.stop()
 
@@ -553,6 +557,7 @@ current_work = 1
 on_additional_line = False
 white_mask = None
 red_mask = None
+task3_finished = False
 image_width = 0
 g_odom = {'x':0.0, 'y':0.0, 'yaw_z':0.0}
 
