@@ -135,9 +135,9 @@ class Rotate(smach.State):
                         return 'end'
 
             elif g_odom['yaw_z']> target_yaw:
-                twist.angular.z = -0.3
+                twist.angular.z = -0.4
             else:
-                twist.angular.z = 0.3
+                twist.angular.z = 0.4
             #print g_odom['yaw_z'], target_yaw
             twist_pub.publish(twist)
         return 'running'
