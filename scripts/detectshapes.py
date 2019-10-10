@@ -41,7 +41,7 @@ class ContourDetector():
         #print search_top, search_bot, search_left, search_right
         if loc == 1:
             #print "loc = 1"
-            search_top = 4 * h / 5
+            search_top = 2 * h / 3
             search_bot = h
         elif loc == 2:
             #print "loc = 2"
@@ -49,7 +49,7 @@ class ContourDetector():
             search_bot = h
         elif loc == 3:
             #print "loc = 3"
-            search_top = 5 * h / 7
+            search_top = 1 * h / 2
             if loc3count == 3:
                 search_left = 1 * w / 2
             else:

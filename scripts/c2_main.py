@@ -181,7 +181,7 @@ class Work1(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red", 1)
-                time.sleep(3)
+                time.sleep(1)
                 contours2 = cd.getContours(self.hsv, "red", 1)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
@@ -227,7 +227,7 @@ class Work2(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red and green", 2)
-                rospy.sleep(3)
+                time.sleep(2)
                 contours2 = cd.getContours(self.hsv, "red and green", 2)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
@@ -245,7 +245,7 @@ class Work2(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "green", 2)
-                rospy.sleep(3)
+                time.sleep(2)
                 contours2 = cd.getContours(self.hsv, "green", 2)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2) and len(contours1) > 0:
@@ -307,7 +307,7 @@ class Work2Follow(smach.State):
 
             # BEGIN CONTROL
             err = cx - image_width / 2
-            self.w2_twist.linear.x = 0.5  # and <= 1.7
+            self.w2_twist.linear.x = 0.4  # and <= 1.7
 
             self.w2_integral = self.w2_integral + err * 0.05
             self.w2_derivative = (err - self.w2_previous_error) / 0.05
@@ -339,9 +339,9 @@ class Work3(smach.State):
     def execute(self, userdata):
         global work, current_work, redline_count_loc3
         redline_count_loc3 += 1
-        move_forward(-0.12)
+        move_forward(-0.1)
         self.observe()
-        move_forward(0.12)
+        move_forward(0.1)
         work = False
         if redline_count_loc3 >= 3:
             current_work += 1
@@ -357,7 +357,7 @@ class Work3(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red", 3, redline_count_loc3)
-                rospy.sleep(3)
+                rospy.sleep(1)
                 contours2 = cd.getContours(self.hsv, "red", 3, redline_count_loc3)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2) and len(contours1) > 0:
