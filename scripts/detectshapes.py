@@ -79,10 +79,10 @@ class ContourDetector():
                 print contour, cv2.contourArea(item)
                 cv2.drawContours(hsv, [item], -1, (255,0,0), 6)
                 contours.append(contour)
-        cv2.imshow("blur_hsv", hsv)
-        cv2.imshow(color + "mask", mask)
-        cv2.moveWindow(color + "mask", 710, 0)
-        cv2.waitKey(4)
+        #cv2.imshow("blur_hsv", hsv)
+        #cv2.imshow(color + "mask", mask)
+        #cv2.moveWindow(color + "mask", 710, 0)
+        #cv2.waitKey(4)
 
         return contours
 

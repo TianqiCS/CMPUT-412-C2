@@ -36,17 +36,17 @@ def approxEqual(a, b, tol = 0.001):
 def publish_sound_led(quantity):
     global sound_pub, led_pub_1, led_pub_2
     if quantity == 1:
-        led_pub_1.publish(Led.GREEN)
+        led_pub_1.publish(Led.RED)
     elif quantity == 2:
-        led_pub_2.publish(Led.GREEN)
+        led_pub_2.publish(Led.RED)
     else:
-        led_pub_1.publish(Led.GREEN)
-        led_pub_2.publish(Led.GREEN)
+        led_pub_1.publish(Led.RED)
+        led_pub_2.publish(Led.RED)
 
     for i in range(quantity):
         sound_pub.publish(1)
         rospy.sleep(1)
-    
+
     led_pub_1.publish(Led.BLACK)
     led_pub_2.publish(Led.BLACK)
 
@@ -307,7 +307,7 @@ class Work2Follow(smach.State):
 
             # BEGIN CONTROL
             err = cx - image_width / 2
-            self.w2_twist.linear.x = 0.4  # and <= 1.7
+            self.w2_twist.linear.x = 0.5  # and <= 1.7
 
             self.w2_integral = self.w2_integral + err * 0.05
             self.w2_derivative = (err - self.w2_previous_error) / 0.05
@@ -324,6 +324,7 @@ class Work2Follow(smach.State):
             if current_work == 3:
                 time.sleep(1)
             self.w2_stop = True
+            twist_pub.publish(Twist())
             if M_red['m00'] > 0 and current_work == 3:
                 print 'saw red'
                 move_forward(0.1)
@@ -536,8 +537,8 @@ class SmCore:
                 elif "PassThrough" in self.sm.get_active_states():
                     stop = False
 
-            # cv2.imshow("refer_dot", image)
-            # cv2.waitKey(3)
+            cv2.imshow("refer_dot", image)
+            cv2.waitKey(3)
             #print stop, turn
     def execute(self):
         begin = time.time()
