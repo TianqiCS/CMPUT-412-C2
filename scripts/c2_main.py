@@ -163,9 +163,9 @@ class Work1(smach.State):
 
     def execute(self, userdata):
         global work, current_work
-        move_forward(-0.1)
+        move_forward(-0.05)
         self.observe()
-        move_forward(0.1)   
+        move_forward(0.05)   
         work = False
         current_work += 1
         userdata.rotate_turns = -1
@@ -181,7 +181,7 @@ class Work1(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red", 1)
-                time.sleep(1)
+                rospy.sleep(1)
                 contours2 = cd.getContours(self.hsv, "red", 1)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
@@ -189,11 +189,11 @@ class Work1(smach.State):
                     publish_sound_led(len(contours1))
                     task_done = True
                     break
-        if task_done == False:
-            contours = cd.getContours(self.hsv, "red", 1)
-            number = 3 if len(contours) == 0 else len(contours)
-            print "Failed Handle: number of objects: ", number 
-            publish_sound_led(number)
+        # if task_done == False:
+        #     contours = cd.getContours(self.hsv, "red", 1)
+        #     number = 3 if len(contours) == 0 else len(contours)
+        #     print "Failed Handle: number of objects: ", number 
+        #     publish_sound_led(number)
         #image_sub.unregister()
 
     def shape_cam_callback(self, msg):
@@ -227,7 +227,7 @@ class Work2(smach.State):
         for i in range(2):
             if self.hsv != None:
                 contours1 = cd.getContours(self.hsv, "red and green", 2)
-                time.sleep(2)
+                rospy.sleep(1)
                 contours2 = cd.getContours(self.hsv, "red and green", 2)
                 print "round ", i, "length1 ", len(contours1), "length2 ", len(contours2)
                 if len(contours1) == len(contours2):
@@ -235,11 +235,11 @@ class Work2(smach.State):
                     publish_sound_led(len(contours1))
                     task_done = True
                     break
-        if task_done == False:
-            contours = cd.getContours(self.hsv, "red and green", 2)
-            number = 3 if len(contours) == 0 else len(contours)
-            print "Failed Handle: number of objects: ", number
-            publish_sound_led(number)
+        # if task_done == False:
+        #     contours = cd.getContours(self.hsv, "red and green", 2)
+        #     number = 3 if len(contours) == 0 else len(contours)
+        #     print "Failed Handle: number of objects: ", number
+        #     publish_sound_led(number)
         
         task_done = False
         for i in range(2):
@@ -254,10 +254,10 @@ class Work2(smach.State):
                         print "shape at loc2: ", shape_at_loc2
                         task_done = True
                         break
-        if task_done == False:
-            contours = cd.getContours(self.hsv, "green", 2)
-            shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
-            print "Failed Handle: shape at loc2: ", shape_at_loc2
+        # if task_done == False:
+        #     contours = cd.getContours(self.hsv, "green", 2)
+        #     shape_at_loc2 = Contour.Circle if len(contours) == 0 else contours[0]
+        #     print "Failed Handle: shape at loc2: ", shape_at_loc2
 
         #image_sub.unregister()
 
@@ -340,9 +340,9 @@ class Work3(smach.State):
     def execute(self, userdata):
         global work, current_work, redline_count_loc3
         redline_count_loc3 += 1
-        move_forward(-0.1)
+        move_forward(-0.05)
         self.observe()
-        move_forward(0.1)
+        move_forward(0.05)
         work = False
         if redline_count_loc3 >= 3:
             current_work += 1
@@ -371,11 +371,12 @@ class Work3(smach.State):
                             break
                         else:
                             print("Found but not matched: ", contours1[0])
+                            break
             print 'shape_at_loc2: ', shape_at_loc2
 
-        if task_done == False and redline_count_loc3 == 3 and task3_finished == False:
-            print "Failed Handle: Found", shape_at_loc2
-            publish_sound_led(1)
+        # if task_done == False and redline_count_loc3 == 3 and task3_finished == False:
+        #     print "Failed Handle: Found", shape_at_loc2
+        #     publish_sound_led(1)
 
         image_sub.unregister()
 
