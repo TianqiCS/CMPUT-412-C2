@@ -38,14 +38,27 @@ Location 3: The final challenge is to determine the shape of the green object at
     source devel/setup.bash
     
     ```
-  remove the folder to c2
+  remove the folder to c2 
     now you can launch the program using
     
     
     $roslaunch c2 c2.launch
     
     
--   arguments and parameters In the launch file c2.launch, the file will launch basic driver for the kuboki robot which is essential for the competition ( minimal.launch and 3dsensor.launch). Next, the file will bring up the basic node for this competition like main file and a usb camera. Finally, there are different sections for in the launch file like example.yaml to give the uvc camera  a basic understanding of view. 
-
+-   arguments and parameters In the launch file c2.launch, the file will launch basic driver for the kuboki robot which is essential for the competition ( minimal.launch and 3dsensor.launch). Next, the file will bring up the basic node for this competition like main file and a usb camera. Finally, there are different sections for in the launch file like example.yaml to give the uvc camera  a basic understanding of view.   
+   
 ## _**Concepts and Strategy**_
 
+-    our basic strategy is based on tutorial given by https://www.pyimagesearch.com/2016/02/08/opencv-shape-detection/ and https://github.com/TianqiCS/CMPUT-412-Demo3
+-    Here are the details:
+-    Firstlly, the robot will initilize the inital yam value for the whole run and approaching the first red line as it following the white line.
+-    As the the robot is running, it will find out whether there is a red long line(which means stop) or a red short line(which means detecting the image)
+-    For different working tasks, the difference is based on the value of "current_work"
+-    The state machine will have some kind of work flow like this:
+        - 1. Following state will keep the robot following the white line
+        - 2. If the robot hit a long red line it will enter the PassThrough state to perform a stop at the long red line
+        - 3. If the robot hit a short red line it will enter the TaskControl state to determine how many 90 degrees it should trun and then it goes into Rotate state which controls the robot's rotation based on the yaw value.
+        - 4. In the Rotate state, the robot will determine what kind of work it will do based on current value.
+#### Notes:
+-    We put additional usb camera at the front of the turtle_bot to follow the white line on the ground and the asus camera is used to detect shape of the target
+-    In the function usb_callback, we use the usb camera to detect whether we have a long red line or short red line. The method is that if it is a long red line there won't be any white in the middle of the track. We think its quicker and easier to identify the difference between two lines.
