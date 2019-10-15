@@ -63,7 +63,9 @@ Location 3: The final challenge is to determine the shape of the green object at
         - 6. One light means one object, if there are three objects, both light will be turned on. Each sound is for one obejct
         - 7. The robot will go through all the shapes when selecting the shapes. If it found the right one it will make a turn on a light and make a sound.
         - 8. The run is ended when the robot is back to the starting line 
-        
+
+![Fig1](smach_states.png)
+
 #### Notes:
 -    We put additional usb camera at the front of the turtle_bot to follow the white line on the ground and the asus camera is used to detect shape of the target
 -    In the function usb_callback, we use the usb camera to detect whether we have a long red line to  short red line. The method is that if it is a long red line there won't be any white in the middle of the track. We think its quicker and easier to identify the difference between two lines.
