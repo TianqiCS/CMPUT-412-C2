@@ -71,3 +71,9 @@ Location 3: The final challenge is to determine the shape of the green object at
 -    In the function usb_callback, we use the usb camera to detect whether we have a long red line to  short red line. The method is that if it is a long red line there won't be any white in the middle of the track. We think its quicker and easier to identify the difference between two lines.
 -    If the object cannot be included into the camera, the robot can back up a little bit to fit the camera view into the right position
 
+#### Sources
+- https://github.com/jackykc/comp5
+- https://github.com/cmput412
+- https://github.com/bofrim/CMPUT_412
+- https://github.com/nwoeanhinnogaehr/412-W19-G5-public
+- https://github.com/stwklu/CMPUT_412_code/
