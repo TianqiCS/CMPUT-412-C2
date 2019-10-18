@@ -81,4 +81,4 @@ Location 3: The final challenge is to determine the shape of the green object at
 - https://github.com/stwklu/CMPUT_412_code/
 - https://www.pyimagesearch.com/2016/02/08/opencv-shape-detection/
 
-![Fig2](environment.png)
+![Fig2](environment.jpg)

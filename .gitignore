@@ -7,3 +7,4 @@
 /scripts/patrick_goebel_follower.py
 /scripts/wanderSM.py
 /scripts/shapestest.py
+*.pyc
